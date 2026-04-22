@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { teacherApi } from '../api';
-import { Trash2, Plus, ArrowLeft, BarChart2, BookOpen, LogOut, Share2, Copy, CheckCircle, Edit2 } from 'lucide-react';
+import { Trash2, Plus, ArrowLeft, BarChart2, BookOpen, LogOut, Share2, Copy, CheckCircle, Edit2, Eye, EyeOff } from 'lucide-react';
 
 function TeacherDashboard({ onBack }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -19,8 +19,10 @@ function TeacherDashboard({ onBack }) {
   const [msg, setMsg] = useState('');
   const [editId, setEditId] = useState(null);
 
+  const [showPassword, setShowPassword] = useState(false);
+
   // New Question Form
-  const [newQ, setNewQ] = useState({ text: '', options: ['', '', '', ''], correct_index: 0, timer_seconds: 30 });
+  const [newQ, setNewQ] = useState({ text: '', options: ['', '', '', ''], correct_index: 0, timer_seconds: 30, test_name: '' });
 
   useEffect(() => {
     checkSetup();
@@ -45,10 +47,10 @@ function TeacherDashboard({ onBack }) {
   const loadData = async () => {
     try {
       if (tab === 'questions') {
-        const res = await teacherApi.getQuestions();
+        const res = await teacherApi.getQuestions(username);
         setQuestions(res.data);
       } else {
-        const res = await teacherApi.getSubmissions();
+        const res = await teacherApi.getSubmissions(username);
         setResults(res.data);
       }
     } catch (err) {
@@ -121,14 +123,15 @@ function TeacherDashboard({ onBack }) {
   const handleAddQuestion = async (e) => {
     e.preventDefault();
     try {
+      const qData = { ...newQ, teacher_username: username };
       if (editId) {
-        await teacherApi.updateQuestion(editId, newQ);
+        await teacherApi.updateQuestion(editId, qData);
         alert('Question updated successfully');
       } else {
-        await teacherApi.createQuestion(newQ);
+        await teacherApi.createQuestion(qData);
         alert('Question added successfully');
       }
-      setNewQ({ text: '', options: ['', '', '', ''], correct_index: 0, timer_seconds: 30 });
+      setNewQ({ text: '', options: ['', '', '', ''], correct_index: 0, timer_seconds: 30, test_name: newQ.test_name });
       setEditId(null);
       loadData();
     } catch (err) {
@@ -144,7 +147,8 @@ function TeacherDashboard({ onBack }) {
       text: q.text,
       options: [...q.options],
       correct_index: q.correct_index,
-      timer_seconds: q.timer_seconds || 30
+      timer_seconds: q.timer_seconds || 30,
+      test_name: q.test_name || ''
     });
   };
 
@@ -179,7 +183,12 @@ function TeacherDashboard({ onBack }) {
             {authMode === 'login' && (
               <form onSubmit={handleLogin}>
                 <input className="input" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} required />
-                <input type="password" className="input" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required />
+                <div style={{ position: 'relative' }}>
+                  <input type={showPassword ? "text" : "password"} className="input" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '10px', top: '24px', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
                 {error && <p style={{ color: 'var(--error)', marginBottom: '1rem', fontSize: '0.9rem' }}>{error}</p>}
                 <button className="btn btn-primary" style={{ width: '100%', marginBottom: '1rem', justifyContent: 'center' }}>Login</button>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
@@ -193,7 +202,12 @@ function TeacherDashboard({ onBack }) {
               <form onSubmit={handleRegister}>
                 {!isSetup && <p style={{ color: 'var(--primary)', fontSize: '0.85rem', marginBottom: '1rem', textAlign: 'center' }}>Create the first Master Administrator account.</p>}
                 <input className="input" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} required />
-                <input type="password" className="input" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required />
+                <div style={{ position: 'relative' }}>
+                  <input type={showPassword ? "text" : "password"} className="input" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '10px', top: '24px', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
                 <input className="input" placeholder="Security Question (e.g., First pet?)" value={securityQuestion} onChange={e => setSecurityQuestion(e.target.value)} required />
                 <input className="input" placeholder="Security Answer" value={securityAnswer} onChange={e => setSecurityAnswer(e.target.value)} required />
                 {error && <p style={{ color: 'var(--error)', marginBottom: '1rem', fontSize: '0.9rem' }}>{error}</p>}
@@ -219,7 +233,12 @@ function TeacherDashboard({ onBack }) {
                   <form onSubmit={handleResetPassword}>
                     <p style={{ marginBottom: '1rem', fontWeight: 600, background: 'rgba(255,255,255,0.05)', padding: '0.5rem', borderRadius: '0.5rem' }}>Q: {securityQuestion}</p>
                     <input className="input" placeholder="Your Answer" value={securityAnswer} onChange={e => setSecurityAnswer(e.target.value)} required />
-                    <input type="password" className="input" placeholder="New Password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
+                    <div style={{ position: 'relative' }}>
+                      <input type={showPassword ? "text" : "password"} className="input" placeholder="New Password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '10px', top: '24px', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
                     {error && <p style={{ color: 'var(--error)', marginBottom: '1rem', fontSize: '0.9rem' }}>{error}</p>}
                     <button className="btn btn-primary" style={{ width: '100%', marginBottom: '1rem', justifyContent: 'center' }}>Reset Password</button>
                   </form>
@@ -269,6 +288,15 @@ function TeacherDashboard({ onBack }) {
           <div className="card" style={{ alignSelf: 'start', position: 'sticky', top: '2rem' }}>
             <h3 style={{ marginBottom: '1.5rem' }}>{editId ? 'Edit Question' : 'Add New Question'}</h3>
             <form onSubmit={handleAddQuestion}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Test / Quiz Name</p>
+              <input 
+                className="input" 
+                placeholder="e.g. Midterm, Quiz 1" 
+                value={newQ.test_name} 
+                onChange={e => setNewQ({...newQ, test_name: e.target.value})} 
+                required 
+              />
+
               <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.3rem' }}>Question Content</p>
               <input 
                 className="input" 
@@ -326,7 +354,7 @@ function TeacherDashboard({ onBack }) {
                 {editId && (
                   <button type="button" className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => {
                     setEditId(null);
-                    setNewQ({ text: '', options: ['', '', '', ''], correct_index: 0, timer_seconds: 30 });
+                    setNewQ({ text: '', options: ['', '', '', ''], correct_index: 0, timer_seconds: 30, test_name: newQ.test_name });
                   }}>
                     Cancel Edit
                   </button>
@@ -348,9 +376,21 @@ function TeacherDashboard({ onBack }) {
                       padding: '0.2rem 0.5rem', 
                       borderRadius: '0.4rem',
                       display: 'inline-block',
-                      marginBottom: '0.5rem'
+                      marginBottom: '0.5rem',
+                      marginRight: '0.5rem'
                     }}>
                       ⏱️ {q.timer_seconds}s Limit
+                    </span>
+                    <span style={{ 
+                      fontSize: '0.75rem', 
+                      background: 'rgba(16, 185, 129, 0.1)', 
+                      color: 'var(--success)', 
+                      padding: '0.2rem 0.5rem', 
+                      borderRadius: '0.4rem',
+                      display: 'inline-block',
+                      marginBottom: '0.5rem'
+                    }}>
+                      📝 {q.test_name || 'No Test Name'}
                     </span>
                     <p style={{ fontWeight: 600 }}>{qidx + 1}. {q.text}</p>
                   </div>
@@ -387,6 +427,7 @@ function TeacherDashboard({ onBack }) {
           <table>
             <thead>
               <tr>
+                <th>Test Name</th>
                 <th>Student Name</th>
                 <th>Roll No</th>
                 <th>Score</th>
@@ -397,6 +438,7 @@ function TeacherDashboard({ onBack }) {
             <tbody>
               {results.map(r => (
                 <tr key={r.id}>
+                  <td style={{ fontWeight: 600, color: 'var(--primary)' }}>{r.test_name || 'N/A'}</td>
                   <td style={{ fontWeight: 600 }}>{r.student_name}</td>
                   <td>{r.roll_no}</td>
                   <td style={{ fontSize: '1.1rem', fontWeight: 700 }}>{r.score} / {r.total_questions}</td>

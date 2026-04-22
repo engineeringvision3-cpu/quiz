@@ -14,15 +14,16 @@ export const teacherApi = {
   register: (data) => api.post('/teacher/register', data),
   getSecurityQuestion: (username) => api.post('/teacher/get-question', { username }),
   resetPassword: (data) => api.post('/teacher/reset-password', data),
-  getQuestions: () => api.get('/questions'),
+  getQuestions: (teacher_username) => api.get('/questions', { params: { teacher_username } }),
   createQuestion: (data) => api.post('/questions', data),
   updateQuestion: (id, data) => api.put(`/questions/${id}`, data),
   deleteQuestion: (id) => api.delete(`/questions/${id}`),
-  getSubmissions: () => api.get('/submissions'),
+  getSubmissions: (teacher_username) => api.get('/submissions', { params: { teacher_username } }),
 };
 
 export const studentApi = {
-  getQuestions: () => api.get('/questions'),
+  getTests: () => api.get('/tests'),
+  getQuestions: (test_name, teacher_username) => api.get('/questions', { params: { test_name, teacher_username } }),
   submitQuiz: (data) => api.post('/submissions', data),
 };
 

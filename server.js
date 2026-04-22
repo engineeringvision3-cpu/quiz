@@ -14,11 +14,23 @@ app.use(express.json());
 // Database setup
 let db;
 (async () => {
+    // Vercel serverless functions are read-only, so we must use /tmp
+    // Note: Data in /tmp is ephemeral and will be lost between function executions.
+    const dbPath = process.env.VERCEL ? '/tmp/quiz.db' : path.join(__dirname, 'quiz.db');
+    
+    // If on Vercel, we might need to copy the initial DB if it doesn't exist in /tmp
+    if (process.env.VERCEL) {
+        const fs = require('fs');
+        if (!fs.existsSync(dbPath) && fs.existsSync(path.join(__dirname, 'quiz.db'))) {
+            fs.copyFileSync(path.join(__dirname, 'quiz.db'), dbPath);
+        }
+    }
+
     db = await open({
-        filename: path.join(__dirname, 'quiz.db'),
+        filename: dbPath,
         driver: sqlite3.Database
     });
-    console.log('Connected to SQLite database.');
+    console.log(`Connected to SQLite database at ${dbPath}.`);
 
     // Initialize tables if they don't exist
     await db.exec(`
@@ -27,7 +39,9 @@ let db;
             text TEXT,
             options TEXT,
             correct_index INTEGER,
-            timer_seconds INTEGER DEFAULT 30
+            timer_seconds INTEGER DEFAULT 30,
+            teacher_username TEXT,
+            test_name TEXT
         );
         CREATE TABLE IF NOT EXISTS admin_settings (
             key TEXT PRIMARY KEY,
@@ -39,7 +53,9 @@ let db;
             roll_no TEXT,
             score INTEGER,
             total_questions INTEGER,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            teacher_username TEXT,
+            test_name TEXT
         );
         CREATE TABLE IF NOT EXISTS teachers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,6 +65,22 @@ let db;
             security_answer TEXT
         );
     `);
+    
+    // Add columns if they don't exist for backward compatibility with existing db
+    try {
+        await db.exec(`
+            ALTER TABLE questions ADD COLUMN teacher_username TEXT;
+            ALTER TABLE questions ADD COLUMN test_name TEXT;
+        `);
+    } catch(e) {} // Ignore if columns already exist
+    
+    try {
+        await db.exec(`
+            ALTER TABLE submissions ADD COLUMN teacher_username TEXT;
+            ALTER TABLE submissions ADD COLUMN test_name TEXT;
+        `);
+    } catch(e) {}
+
     console.log('Database tables verified/created.');
 })();
 
@@ -134,9 +166,30 @@ app.post('/api/teacher/reset-password', async (req, res) => {
 });
 
 // --- Question Management (Teacher) ---
-app.get('/api/questions', async (req, res) => {
+app.get('/api/tests', async (req, res) => {
     try {
-        const questions = await db.all('SELECT * FROM questions');
+        const tests = await db.all('SELECT DISTINCT test_name, teacher_username FROM questions WHERE test_name IS NOT NULL AND teacher_username IS NOT NULL');
+        res.json(tests);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/questions', async (req, res) => {
+    const { teacher_username, test_name } = req.query;
+    try {
+        let query = 'SELECT * FROM questions';
+        const params = [];
+        
+        if (teacher_username && test_name) {
+            query += ' WHERE teacher_username = ? AND test_name = ?';
+            params.push(teacher_username, test_name);
+        } else if (teacher_username) {
+            query += ' WHERE teacher_username = ?';
+            params.push(teacher_username);
+        }
+        
+        const questions = await db.all(query, params);
         // Parse options JSON
         const parsedQuestions = questions.map(q => ({
             ...q,
@@ -149,13 +202,13 @@ app.get('/api/questions', async (req, res) => {
 });
 
 app.post('/api/questions', async (req, res) => {
-    const { text, options, correct_index, timer_seconds } = req.body;
+    const { text, options, correct_index, timer_seconds, teacher_username, test_name } = req.body;
     try {
         const result = await db.run(
-            'INSERT INTO questions (text, options, correct_index, timer_seconds) VALUES (?, ?, ?, ?)',
-            [text, JSON.stringify(options), correct_index, timer_seconds]
+            'INSERT INTO questions (text, options, correct_index, timer_seconds, teacher_username, test_name) VALUES (?, ?, ?, ?, ?, ?)',
+            [text, JSON.stringify(options), correct_index, timer_seconds, teacher_username, test_name]
         );
-        res.status(201).json({ id: result.lastID, text, options, correct_index, timer_seconds });
+        res.status(201).json({ id: result.lastID, text, options, correct_index, timer_seconds, teacher_username, test_name });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -163,13 +216,13 @@ app.post('/api/questions', async (req, res) => {
 
 app.put('/api/questions/:id', async (req, res) => {
     const { id } = req.params;
-    const { text, options, correct_index, timer_seconds } = req.body;
+    const { text, options, correct_index, timer_seconds, teacher_username, test_name } = req.body;
     try {
         await db.run(
-            'UPDATE questions SET text = ?, options = ?, correct_index = ?, timer_seconds = ? WHERE id = ?',
-            [text, JSON.stringify(options), correct_index, timer_seconds, id]
+            'UPDATE questions SET text = ?, options = ?, correct_index = ?, timer_seconds = ?, teacher_username = ?, test_name = ? WHERE id = ?',
+            [text, JSON.stringify(options), correct_index, timer_seconds, teacher_username, test_name, id]
         );
-        res.json({ id, text, options, correct_index, timer_seconds });
+        res.json({ id, text, options, correct_index, timer_seconds, teacher_username, test_name });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -187,22 +240,31 @@ app.delete('/api/questions/:id', async (req, res) => {
 
 // --- Student Submissions ---
 app.post('/api/submissions', async (req, res) => {
-    const { student_name, roll_no, score, total_questions } = req.body;
+    const { student_name, roll_no, score, total_questions, teacher_username, test_name } = req.body;
     const timestamp = new Date().toISOString();
     try {
         const result = await db.run(
-            'INSERT INTO submissions (student_name, roll_no, score, total_questions, timestamp) VALUES (?, ?, ?, ?, ?)',
-            [student_name, roll_no, score, total_questions, timestamp]
+            'INSERT INTO submissions (student_name, roll_no, score, total_questions, timestamp, teacher_username, test_name) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [student_name, roll_no, score, total_questions, timestamp, teacher_username, test_name]
         );
-        res.status(201).json({ id: result.lastID, student_name, roll_no, score, total_questions, timestamp });
+        res.status(201).json({ id: result.lastID, student_name, roll_no, score, total_questions, timestamp, teacher_username, test_name });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
 app.get('/api/submissions', async (req, res) => {
+    const { teacher_username } = req.query;
     try {
-        const submissions = await db.all('SELECT * FROM submissions ORDER BY timestamp DESC');
+        let query = 'SELECT * FROM submissions';
+        const params = [];
+        if (teacher_username) {
+            query += ' WHERE teacher_username = ?';
+            params.push(teacher_username);
+        }
+        query += ' ORDER BY timestamp DESC';
+        
+        const submissions = await db.all(query, params);
         res.json(submissions);
     } catch (err) {
         res.status(500).json({ error: err.message });

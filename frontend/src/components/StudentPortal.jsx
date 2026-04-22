@@ -4,8 +4,21 @@ import { ArrowLeft, Send, CheckCircle, GraduationCap, Award } from 'lucide-react
 
 function StudentPortal({ onBack }) {
   const [step, setStep] = useState('login'); // login, quiz, results
-  const [studentInfo, setStudentInfo] = useState({ name: '', roll_no: '' });
+  const [studentInfo, setStudentInfo] = useState({ name: '', roll_no: '', test_name: '', teacher_username: '' });
   const [questions, setQuestions] = useState([]);
+  const [availableTests, setAvailableTests] = useState([]);
+
+  useEffect(() => {
+    const fetchTests = async () => {
+      try {
+        const res = await studentApi.getTests();
+        setAvailableTests(res.data);
+      } catch (err) {
+        console.error("Failed to load tests", err);
+      }
+    };
+    fetchTests();
+  }, []);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [finalScore, setFinalScore] = useState(null);
@@ -42,10 +55,10 @@ function StudentPortal({ onBack }) {
 
   const startQuiz = async (e) => {
     e.preventDefault();
-    if (!studentInfo.name || !studentInfo.roll_no) return;
+    if (!studentInfo.name || !studentInfo.roll_no || !studentInfo.test_name) return;
     setLoading(true);
     try {
-      const res = await studentApi.getQuestions();
+      const res = await studentApi.getQuestions(studentInfo.test_name, studentInfo.teacher_username);
       setQuestions(res.data);
       if (res.data.length > 0) {
         setTimeLeft(res.data[0].timer_seconds || 30);
@@ -89,7 +102,9 @@ function StudentPortal({ onBack }) {
         student_name: studentInfo.name,
         roll_no: studentInfo.roll_no,
         score: score,
-        total_questions: questions.length
+        total_questions: questions.length,
+        test_name: studentInfo.test_name,
+        teacher_username: studentInfo.teacher_username
       });
       setFinalScore(score);
       setStep('results');
@@ -126,6 +141,23 @@ function StudentPortal({ onBack }) {
               onChange={e => setStudentInfo({...studentInfo, roll_no: e.target.value})} 
               required 
             />
+            <select 
+              className="input" 
+              value={studentInfo.test_name && studentInfo.teacher_username ? `${studentInfo.test_name}|${studentInfo.teacher_username}` : ""}
+              onChange={e => {
+                const [test_name, teacher_username] = e.target.value.split('|');
+                setStudentInfo({...studentInfo, test_name, teacher_username});
+              }}
+              required
+              style={{ appearance: 'auto' }}
+            >
+              <option value="" disabled>Select a Test</option>
+              {availableTests.map((t, i) => (
+                <option key={i} value={`${t.test_name}|${t.teacher_username}`}>
+                  {t.test_name} (by {t.teacher_username})
+                </option>
+              ))}
+            </select>
             <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={loading}>
               {loading ? 'Loading Quiz...' : 'Start Assessment'}
             </button>
