@@ -18,7 +18,7 @@ function TeacherDashboard({ onBack }) {
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
   const [editId, setEditId] = useState(null);
-
+  const [showShareModal, setShowShareModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   // New Question Form
@@ -164,6 +164,29 @@ function TeacherDashboard({ onBack }) {
     }
   };
 
+  const handleCopyLink = (url) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url)
+        .then(() => alert('✅ Link copied to clipboard!'))
+        .catch(() => {
+          const el = document.getElementById('share-url-text');
+          const range = document.createRange();
+          range.selectNode(el);
+          window.getSelection().removeAllRanges();
+          window.getSelection().addRange(range);
+          alert('⚠️ Auto-copy failed. Please manually copy the highlighted link above.');
+        });
+    } else {
+      const el = document.getElementById('share-url-text');
+      const range = document.createRange();
+      range.selectNode(el);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+      alert('⚠️ Auto-copy not supported. Please manually copy the highlighted link above.');
+    }
+  };
+
+  // ── Auth Screen ──────────────────────────────────────────────────────────────
   if (!isAuthenticated) {
     return (
       <div className="container animate-fade-in" style={{ maxWidth: '500px', marginTop: '10vh' }}>
@@ -254,8 +277,12 @@ function TeacherDashboard({ onBack }) {
     );
   }
 
+  // ── Dashboard (authenticated) ────────────────────────────────────────────────
+  const studentUrl = `${window.location.origin}/?role=student`;
+
   return (
     <div className="container animate-fade-in">
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
         <div>
           <button className="btn btn-secondary" onClick={onBack} style={{ marginBottom: '1rem' }}>
@@ -264,11 +291,7 @@ function TeacherDashboard({ onBack }) {
           <h1>Teacher <span style={{ color: 'var(--primary)' }}>Control Panel</span></h1>
         </div>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <button className="btn btn-secondary" onClick={() => {
-            const studentUrl = `${window.location.origin}/?role=student`;
-            navigator.clipboard.writeText(studentUrl);
-            alert('Student Quiz Link copied to clipboard!');
-          }}>
+          <button className="btn btn-secondary" onClick={() => setShowShareModal(true)}>
             <Share2 size={18} /> Share Quiz
           </button>
           <button className={`btn ${tab === 'questions' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('questions')}>
@@ -283,6 +306,7 @@ function TeacherDashboard({ onBack }) {
         </div>
       </div>
 
+      {/* Questions Tab */}
       {tab === 'questions' ? (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
           <div className="card" style={{ alignSelf: 'start', position: 'sticky', top: '2rem' }}>
@@ -369,27 +393,10 @@ function TeacherDashboard({ onBack }) {
               <div key={q.id} style={{ padding: '1.5rem 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
                   <div>
-                    <span style={{ 
-                      fontSize: '0.75rem', 
-                      background: 'rgba(99, 102, 241, 0.1)', 
-                      color: 'var(--primary)', 
-                      padding: '0.2rem 0.5rem', 
-                      borderRadius: '0.4rem',
-                      display: 'inline-block',
-                      marginBottom: '0.5rem',
-                      marginRight: '0.5rem'
-                    }}>
+                    <span style={{ fontSize: '0.75rem', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary)', padding: '0.2rem 0.5rem', borderRadius: '0.4rem', display: 'inline-block', marginBottom: '0.5rem', marginRight: '0.5rem' }}>
                       ⏱️ {q.timer_seconds}s Limit
                     </span>
-                    <span style={{ 
-                      fontSize: '0.75rem', 
-                      background: 'rgba(16, 185, 129, 0.1)', 
-                      color: 'var(--success)', 
-                      padding: '0.2rem 0.5rem', 
-                      borderRadius: '0.4rem',
-                      display: 'inline-block',
-                      marginBottom: '0.5rem'
-                    }}>
+                    <span style={{ fontSize: '0.75rem', background: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)', padding: '0.2rem 0.5rem', borderRadius: '0.4rem', display: 'inline-block', marginBottom: '0.5rem' }}>
                       📝 {q.test_name || 'No Test Name'}
                     </span>
                     <p style={{ fontWeight: 600 }}>{qidx + 1}. {q.text}</p>
@@ -406,9 +413,7 @@ function TeacherDashboard({ onBack }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '1rem' }}>
                   {q.options.map((opt, i) => (
                     <div key={i} style={{ 
-                      fontSize: '0.9rem', 
-                      padding: '0.5rem', 
-                      borderRadius: '0.5rem',
+                      fontSize: '0.9rem', padding: '0.5rem', borderRadius: '0.5rem',
                       background: i === q.correct_index ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255,255,255,0.03)',
                       color: i === q.correct_index ? 'var(--success)' : 'var(--text-muted)',
                       border: i === q.correct_index ? '1px solid var(--success)' : '1px solid transparent'
@@ -422,6 +427,7 @@ function TeacherDashboard({ onBack }) {
           </div>
         </div>
       ) : (
+        /* Results Tab */
         <div className="card">
           <h3 style={{ marginBottom: '1.5rem' }}>Student Performance Report</h3>
           <table>
@@ -444,9 +450,10 @@ function TeacherDashboard({ onBack }) {
                   <td style={{ fontSize: '1.1rem', fontWeight: 700 }}>{r.score} / {r.total_questions}</td>
                   <td>{new Date(r.timestamp).toLocaleDateString()}</td>
                   <td>
-                    <span className={`badge ${r.score / r.total_questions >= 0.5 ? 'badge-success' : 'badge-error'}`} style={{ 
+                    <span style={{ 
                       background: r.score / r.total_questions >= 0.5 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                      color: r.score / r.total_questions >= 0.5 ? '#10b981' : '#ef4444'
+                      color: r.score / r.total_questions >= 0.5 ? '#10b981' : '#ef4444',
+                      padding: '0.25rem 0.75rem', borderRadius: '0.4rem', fontSize: '0.85rem', fontWeight: 600
                     }}>
                       {r.score / r.total_questions >= 0.5 ? 'Passed' : 'Failed'}
                     </span>
@@ -455,6 +462,67 @@ function TeacherDashboard({ onBack }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Share Quiz Modal */}
+      {showShareModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowShareModal(false)}
+        >
+          <div
+            className="card"
+            style={{ maxWidth: '520px', width: '90%' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ marginBottom: '0.5rem' }}>📤 Share Quiz with Students</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              Send this link to your students. They will land directly on the Student Portal and can select the test from the dropdown.
+            </p>
+
+            {/* URL display box */}
+            <div style={{
+              display: 'flex', gap: '0.5rem', alignItems: 'center',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: '0.75rem',
+              padding: '0.75rem 1rem',
+              marginBottom: '1.25rem'
+            }}>
+              <span
+                id="share-url-text"
+                style={{ flex: 1, fontSize: '0.85rem', wordBreak: 'break-all', color: 'var(--primary)', userSelect: 'all' }}
+              >
+                {studentUrl}
+              </span>
+              <button
+                className="btn btn-primary"
+                style={{ whiteSpace: 'nowrap', padding: '0.5rem 1rem', flexShrink: 0 }}
+                onClick={() => handleCopyLink(studentUrl)}
+              >
+                <Copy size={16} /> Copy
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+              💡 Students will select the <strong>Test Name</strong> and <strong>Teacher</strong> from a dropdown after opening the link.
+            </p>
+
+            <button
+              className="btn btn-secondary"
+              style={{ width: '100%', justifyContent: 'center' }}
+              onClick={() => setShowShareModal(false)}
+            >
+              Close
+            </button>
+          </div>
         </div>
       )}
     </div>
