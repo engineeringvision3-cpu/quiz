@@ -67,19 +67,12 @@ let db;
     `);
     
     // Add columns if they don't exist for backward compatibility with existing db
-    try {
-        await db.exec(`
-            ALTER TABLE questions ADD COLUMN teacher_username TEXT;
-            ALTER TABLE questions ADD COLUMN test_name TEXT;
-        `);
-    } catch(e) {} // Ignore if columns already exist
+    try { await db.exec(`ALTER TABLE questions ADD COLUMN teacher_username TEXT;`); } catch(e) {}
+    try { await db.exec(`ALTER TABLE questions ADD COLUMN test_name TEXT;`); } catch(e) {}
+    try { await db.exec(`ALTER TABLE questions ADD COLUMN timer_seconds INTEGER DEFAULT 30;`); } catch(e) {}
     
-    try {
-        await db.exec(`
-            ALTER TABLE submissions ADD COLUMN teacher_username TEXT;
-            ALTER TABLE submissions ADD COLUMN test_name TEXT;
-        `);
-    } catch(e) {}
+    try { await db.exec(`ALTER TABLE submissions ADD COLUMN teacher_username TEXT;`); } catch(e) {}
+    try { await db.exec(`ALTER TABLE submissions ADD COLUMN test_name TEXT;`); } catch(e) {}
 
     console.log('Database tables verified/created.');
 })();
