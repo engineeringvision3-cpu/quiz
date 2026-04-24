@@ -9,6 +9,8 @@ This is a portable version of the **8051 Quiz Pro** application. It has been sim
 3.  **Share with Students**:
     - **Offline (Same Wi-Fi)**: Tell students to go to the IP address shown in the black server window.
     - **Online (From Home)**: Double-click **`share_quiz.bat`**. It will give you a public link (e.g., `https://example.loca.lt`) to send to your students.
+12. **Live Proctoring**: Access the **Monitor** tab in the Teacher Dashboard to see real-time alerts if students switch tabs or apps during the quiz.
+
 
 ## 🛠️ Internal Structure
 
