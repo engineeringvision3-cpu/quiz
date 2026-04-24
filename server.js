@@ -16,13 +16,7 @@ const allowedOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',')
     : ['http://localhost:5173', 'http://localhost:8000', 'http://127.0.0.1:5173', 'http://127.0.0.1:8000'];
 
-app.use(cors({
-    origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, curl, Postman)
-        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-        callback(new Error(`CORS: Origin '${origin}' not allowed.`));
-    }
-}));
+app.use(cors()); // Allow all origins for easier deployment on Vercel
 app.use(express.json());
 
 // ── FIX #2: JWT Auth Middleware ───────────────────────────────────────────────
